@@ -1,0 +1,15 @@
+Install via Homebrew:
+brew install pinentry-mac
+
+Then configure GPG:
+echo "pinentry-program /usr/local/bin/pinentry-mac" >> ~/.gnupg/gpg-agent.conf
+killall gpg-agent
+
+defaults write com.apple.finder _FXShowPosixPathInTitle -bool YES
+
+mousewheel.default.delta_multiplier_y 190
+
+do shell script "/Applications/Firefox.app/Contents/MacOS/firefox -p main &"
+
+emoji picker animation disable:
+defaults write -g NSAutomaticWindowAnimationsEnabled -bool false
