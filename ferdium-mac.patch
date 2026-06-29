@@ -1,0 +1,154 @@
+diff --git a/.github/workflows/builds.yml b/.github/workflows/builds.yml
+index 8bec7624..800f7f10 100644
+--- a/.github/workflows/builds.yml
++++ b/.github/workflows/builds.yml
+@@ -38,9 +38,13 @@ jobs:
+           git push origin develop --force-with-lease
+ 
+   build_linux:
+-    name: "Linux Build"
++    name: "Build Linux"
+     runs-on: ubuntu-latest
+     needs: sync_upstream
++    
++    outputs:
++      electron_version: ${{ env.LATEST_ELECTRON }}
++      skip_build: ${{ env.SKIP_BUILD }}
+ 
+     steps:
+       - name: Set env vars
+@@ -72,7 +76,7 @@ jobs:
+           GH_TOKEN: ${{ github.token }}
+         id: last_release
+         run: |
+-          RESPONSE=$(gh api repos/Tomurisk/ferdium-custom-build/releases/latest)
++          RESPONSE=$(gh api repos/Tomurisk/ferdium-custom-build/releases/latest 2>/dev/null || echo "{}")
+ 
+           LAST_ELECTRON=$(echo "$RESPONSE" | grep -oP 'Electron:\s*\K[0-9]+\.[0-9]+\.[0-9]+' || echo "none")
+ 
+@@ -191,3 +195,90 @@ jobs:
+             out/Ferdium*.tar.gz
+         env:
+           GITHUB_TOKEN: ${{ secrets.FERDIUM_PUBLISH_TOKEN }}
++
++      - name: Set job outputs
++        id: set_outputs
++        run: |
++          echo "electron_version=$LATEST_ELECTRON" >> $GITHUB_OUTPUT
++          echo "skip_build=$SKIP_BUILD" >> $GITHUB_OUTPUT
++
++  build_macos:
++    name: "Build macOS"
++    runs-on: macos-latest
++    needs: build_linux
++
++    # -----------------------------------------------------
++    # Skip entire macOS job if Linux determined no update
++    # -----------------------------------------------------
++    if: needs.build_linux.outputs.skip_build != 'true'
++
++    env:
++      # Electron version passed from Linux job
++      LATEST_ELECTRON: ${{ needs.build_linux.outputs.electron_version }}
++
++    steps:
++      - name: Set env vars
++        run: |
++          echo "NPM_CACHE=$HOME/.npm" >> $GITHUB_ENV
++          echo "ELECTRON_CACHE=$HOME/.cache/electron" >> $GITHUB_ENV
++          echo "ELECTRON_BUILDER_CACHE=$HOME/.cache/electron-builder" >> $GITHUB_ENV
++
++      - name: Checkout develop branch
++        uses: actions/checkout@main
++        with:
++          ref: develop
++          submodules: recursive
++          fetch-depth: 0
++
++      - name: Use Node.js
++        uses: actions/setup-node@main
++        with:
++          node-version-file: '.nvmrc'
++
++      - name: Install pnpm
++        uses: pnpm/action-setup@master
++
++      # -----------------------------------------------------
++      # Bump Electron using version from Linux job
++      # -----------------------------------------------------
++      - name: Bump Electron locally
++        run: |
++          jq --arg ver "$LATEST_ELECTRON" '.devDependencies.electron = $ver' package.json > package.tmp && mv package.tmp package.json
++          pnpm install --lockfile-only
++
++      - name: Install node dependencies
++        run: pnpm install
++
++      - name: Package recipes
++        run: |
++          pnpm i
++          pnpm lint
++          pnpm reformat-files
++          pnpm package
++        working-directory: ./recipes
++
++      - name: Run linter and tests
++        run: |
++          pnpm lint
++          pnpm test
++
++      - name: Build macOS DMG
++        env:
++          CSC_IDENTITY_AUTO_DISCOVERY: false
++        run: pnpm build --publish never
++
++      # -----------------------------------------------------
++      # Upload macOS artifacts to the same release
++      # -----------------------------------------------------
++      - name: Upload macOS artifacts
++        uses: softprops/action-gh-release@master
++        with:
++          tag_name: continuous
++          name: "Continuous Build"
++          prerelease: false
++          body: |
++            Electron: ${{ env.LATEST_ELECTRON }}
++          files: |
++            out/Ferdium*.dmg
++        env:
++          GITHUB_TOKEN: ${{ secrets.FERDIUM_PUBLISH_TOKEN }}
+\ No newline at end of file
+diff --git a/electron-builder.yml b/electron-builder.yml
+index 8b7fa4c8..78742b62 100644
+--- a/electron-builder.yml
++++ b/electron-builder.yml
+@@ -17,6 +17,29 @@ asarUnpack:
+   - ./assets/images/taskbar
+   - ./assets/images/icons
+ 
++mac:
++  extendInfo:
++    NSFocusStatusUsageDescription: "Ferdium needs access to your Focus status to function properly."
++  icon: ./build-helpers/images/icon.icns
++  category: public.app-category.social-networking
++  artifactName: "${productName}-${arch}.${ext}"
++  target:
++    - target: dmg
++      arch: x64
++    - target: dmg
++      arch: arm64
++
++dmg:
++  background: ./build-helpers/images/dmgInstaller.tiff
++  icon: ./build-helpers/images/icon.icns
++  iconSize: 128
++  contents:
++    [
++      { x: 380, y: 240, type: link, path: /Applications },
++      { x: 122, y: 240, type: file },
++    ]
++  artifactName: "${productName}-${arch}.${ext}"
++
+ linux:
+   icon: ./build-helpers/images/icons
+   category: Network;InstantMessaging;
