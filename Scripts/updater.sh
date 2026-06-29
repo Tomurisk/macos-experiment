@@ -83,4 +83,4 @@ update_pdfxchange
 rm -rf "$TEMP_DIR"
 echo "🎉 All applications are up-to-date!"
 
-osascript -e 'tell application "Terminal" to quit'
+osascript -e 'tell application "Terminal" to close front window'
