@@ -13,3 +13,14 @@ do shell script "/Applications/Firefox.app/Contents/MacOS/firefox -p main &"
 
 emoji picker animation disable:
 defaults write -g NSAutomaticWindowAnimationsEnabled -bool false
+
+cd /Applications/kolourpaint.app/Contents/MacOS
+mv kolourpaint kolourpaint.bin
+nano kolourpaint
+
+#!/bin/bash
+export QT_STYLE_OVERRIDE=Fusion
+export QT_QPA_PLATFORMTHEME=light
+exec "$(dirname "$0")/kolourpaint.bin" "$@"
+
+chmod +x kolourpaint
