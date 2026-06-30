@@ -324,20 +324,21 @@ wakeWatcher:start()
 -- F19 → Cmd+W
 ------------------------------------------------------------
 
-local f19Handler
+local lastF19Press = 0
+local cooldown = 0.3 -- 300 ms
 
-f19Handler = hs.hotkey.bind({}, "F19", function()
-    f19Handler:disable()
+local f19 = hs.hotkey.new({}, "F19", function()
+    local now = hs.timer.secondsSinceEpoch()
 
-    local win = hs.window.focusedWindow()
-    if win then
-        local title = win:title()
-        if title and title:match("PDF%-XChange Editor") then
-            hs.eventtap.keyStroke({"ctrl"}, "w", 0)
-        else
-            hs.eventtap.keyStroke({"cmd"}, "w", 0)
-        end
+    if (now - lastF19Press) < cooldown then
+        return
     end
 
-    f19Handler:enable()
+    lastF19Press = now
+
+    -- send raw cmd+w
+    hs.eventtap.event.newKeyEvent({"cmd"}, "w", true):post()
+    hs.eventtap.event.newKeyEvent({"cmd"}, "w", false):post()
 end)
+
+f19:enable()
