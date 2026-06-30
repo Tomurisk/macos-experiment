@@ -8,6 +8,7 @@ killall gpg-agent
 defaults write com.apple.finder _FXShowPosixPathInTitle -bool YES
 
 mousewheel.default.delta_multiplier_y 190
+mousewheel.with_meta.action 3
 
 do shell script "/Applications/Firefox.app/Contents/MacOS/firefox -p main &"
 
